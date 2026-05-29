@@ -72,10 +72,10 @@ def load_hackathon_data(data_dir=DATA_DIR):
             df = pd.read_csv(path, index_col=0, parse_dates=True)
             data[key] = df
             try:
-                rng = f'{df.index[0].date()} → {df.index[-1].date()}'
+                rng = f'{df.index[0].date()} -> {df.index[-1].date()}'
             except Exception:
-                rng = f'{df.index[0]} → {df.index[-1]}'
-            print(f'  [OK] {fname:<35} {df.shape[0]:>5} filas × {df.shape[1]} cols  ({rng})')
+                rng = f'{df.index[0]} -> {df.index[-1]}'
+            print(f'  [OK] {fname:<35} {df.shape[0]:>5} filas x {df.shape[1]} cols  ({rng})')
         except Exception as exc:
             warnings.warn(f'[load_hackathon_data] Error leyendo {path}: {exc}', stacklevel=2)
 
@@ -338,7 +338,7 @@ def eval_all_baselines(data_dict, val_days=VAL_DAYS, v_in=V_IN_SHARED):
 # ── ROLLOUT ────────────────────────────────────────────────────────────────────
 
 def predict_autoregressive(predict_fn, ventana_inicial, n_steps,
-                            precio_inicial=None, aux_data=None):
+                            precio_inicial=None, aux_data=None, clip_logret=0.5):
     """
     Bucle día-a-día que realimenta las predicciones como input del siguiente paso.
     Este es el núcleo del problema: los errores se acumulan en el rollout.
@@ -360,6 +360,16 @@ def predict_autoregressive(predict_fn, ventana_inicial, n_steps,
                       período futuro — solo este punto de anclaje.
     aux_data        : array (n_steps, k) — features auxiliares de los días futuros
                       (p.ej. test_macro alineado con test_dates para Index_C/F)
+    clip_logret     : float (default 0.5). SOLO activo en modo log-retornos
+                      (precio_inicial is not None). Recorta cada log-ret predicho a
+                      [-clip_logret, +clip_logret] ANTES de realimentarlo en la ventana
+                      y de reconstruir el precio.
+                      ⚠️ SALVAGUARDA contra divergencia numérica: en un rollout de 252
+                      días, exp(cumsum(log_rets)) desborda a inf si el modelo se desboca.
+                      ±0.5 ≈ ±65% diario, holgado para no tocar predicciones normales
+                      (~0.01). NO sustituye al backtest: si el clip se activa, el modelo
+                      ya es malo — el backtest lo detectará vía RMSE alto.
+                      Poner None desactiva el clip.
 
     Retorna
     -------
@@ -372,10 +382,18 @@ def predict_autoregressive(predict_fn, ventana_inicial, n_steps,
     window = np.asarray(ventana_inicial, dtype=np.float32).copy()
     v_in, n_features = window.shape
     raw_preds = np.empty(n_steps, dtype=np.float32)
+    log_ret_mode = precio_inicial is not None
 
     for i in range(n_steps):
         x = window[np.newaxis, :, :]      # (1, v_in, n_features)
         next_val = float(predict_fn(x))   # log-ret predicho, o precio predicho
+
+        # ── Clip defensivo (solo log-ret mode): evita overflow en exp(cumsum) ──
+        # Recorta ANTES de almacenar/realimentar → window y reconstrucción coherentes.
+        # En rango normal (~0.01) es un no-op; solo actúa si el modelo diverge.
+        if log_ret_mode and clip_logret is not None:
+            next_val = float(np.clip(next_val, -clip_logret, clip_logret))
+
         raw_preds[i] = next_val
 
         # ── Construir nueva fila: SIEMPRE la predicción propia, nunca un valor real ──
@@ -389,10 +407,14 @@ def predict_autoregressive(predict_fn, ventana_inicial, n_steps,
         window = np.roll(window, -1, axis=0)
         window[-1] = new_row
 
-    if precio_inicial is not None:
+    if log_ret_mode:
         # Reconstrucción: precio[t] = precio_inicial * exp(cumsum(log_rets))
-        # raw_preds son log-retornos; precio_inicial es el último precio real conocido
-        return logret_a_precios(raw_preds, precio_inicial).astype(np.float32)
+        # raw_preds son log-retornos (ya recortados); precio_inicial = último precio real.
+        # ⚠️ Devolver float64 (NO castear a float32): con clip ±0.5 el peor caso es
+        # exp(0.5·252)=exp(126)≈5e54, que cabe en float64 (máx 1.8e308) pero desborda
+        # a inf en float32 (máx 3.4e38). El clip acota el paso; float64 da el margen.
+        # Juntos garantizan un RMSE finito (aunque enorme) que el backtest puede reportar.
+        return logret_a_precios(raw_preds, precio_inicial)
 
     return raw_preds
 
@@ -400,7 +422,8 @@ def predict_autoregressive(predict_fn, ventana_inicial, n_steps,
 # ── VALIDACIÓN INTERNA ─────────────────────────────────────────────────────────
 
 def backtest_autoregressive(predict_fn, series, val_days=VAL_DAYS,
-                            v_in=V_IN_SHARED, log_ret_mode=True, aux_data=None):
+                            v_in=V_IN_SHARED, log_ret_mode=True, aux_data=None,
+                            clip_logret=0.5):
     """
     Simula el rollout autorregresivo completo reservando los últimos val_days días.
 
@@ -488,7 +511,7 @@ def backtest_autoregressive(predict_fn, series, val_days=VAL_DAYS,
         preds_prices = predict_autoregressive(
             predict_fn, ventana, val_days,
             precio_inicial=precio_inicial,   # activa reconstrucción interna
-            aux_data=aux_val
+            aux_data=aux_val, clip_logret=clip_logret
         )
 
     else:
@@ -720,8 +743,8 @@ def train_ensemble(tipo, X_tr, y_tr, X_v, y_v,
 
     y_ens    = np.mean(preds_val, axis=0)
     rmse_ens = float(rmse_per_index(y_v, y_ens))
-    print(f'\n  Ensemble ({n_seeds} seeds)  →  val RMSE (ventana) = {rmse_ens:.2f}')
-    print('  ⚠️  Llamar backtest_autoregressive(result["predict_fn"], ...) para el RMSE real')
+    print(f'\n  Ensemble ({n_seeds} seeds)  ->  val RMSE (ventana) = {rmse_ens:.2f}')
+    print('  [!] Llamar backtest_autoregressive(result["predict_fn"], ...) para el RMSE real')
 
     def ensemble_predict_fn(x):
         return float(np.mean([m.predict(x, verbose=0).ravel()[0]
@@ -737,6 +760,25 @@ def train_ensemble(tipo, X_tr, y_tr, X_v, y_v,
 
 # ── ENTREGA ────────────────────────────────────────────────────────────────────
 
+def _as_date_index(test_dates):
+    """
+    Extrae las 252 fechas de test_dates de forma robusta a cómo se cargó:
+      - DataFrame con DatetimeIndex (como lo devuelve load_hackathon_data con
+        index_col=0) → usa el índice
+      - DataFrame con las fechas en la 1ª columna (read_csv sin index_col) → usa col 0
+      - Series / Index / lista / array → conversión directa
+    """
+    if isinstance(test_dates, pd.DataFrame):
+        if isinstance(test_dates.index, pd.DatetimeIndex) or test_dates.shape[1] == 0:
+            return pd.to_datetime(test_dates.index)
+        return pd.to_datetime(test_dates.iloc[:, 0])
+    if isinstance(test_dates, pd.Series):
+        if isinstance(test_dates.index, pd.DatetimeIndex):
+            return pd.to_datetime(test_dates.index)
+        return pd.to_datetime(test_dates.values)
+    return pd.to_datetime(test_dates)
+
+
 def generar_submission(predicciones_dict, test_dates, filepath='submission.csv'):
     """
     Construye el CSV de entrega 252 × 6.
@@ -749,10 +791,7 @@ def generar_submission(predicciones_dict, test_dates, filepath='submission.csv')
 
     Retorna el DataFrame generado (también lo guarda en filepath).
     """
-    if isinstance(test_dates, pd.DataFrame):
-        dates = pd.to_datetime(test_dates.iloc[:, 0])
-    else:
-        dates = pd.to_datetime(test_dates)
+    dates = _as_date_index(test_dates)
 
     df = pd.DataFrame(index=dates)
     df.index.name = 'Date'
@@ -765,7 +804,7 @@ def generar_submission(predicciones_dict, test_dates, filepath='submission.csv')
             df[col] = np.nan
 
     df.to_csv(filepath)
-    print(f'Submission guardada: {filepath}  ({df.shape[0]} filas × {df.shape[1]} cols)')
+    print(f'Submission guardada: {filepath}  ({df.shape[0]} filas x {df.shape[1]} cols)')
     return df
 
 
@@ -805,27 +844,26 @@ def validar_submission(filepath, test_dates=None):
         errors.append(f'Inf encontrados: {inf_count}')
 
     if test_dates is not None:
-        if isinstance(test_dates, pd.DataFrame):
-            expected = pd.to_datetime(test_dates.iloc[:, 0])
+        expected = _as_date_index(test_dates)
+        if len(df) != len(expected):
+            errors.append(f'test_dates tiene {len(expected)} fechas, submission tiene {len(df)}')
         else:
-            expected = pd.to_datetime(test_dates)
-        if len(df) == len(expected):
             n_mismatch = int((df.index != expected.values).sum())
             if n_mismatch > 0:
                 errors.append(f'{n_mismatch} fechas no coinciden con test_dates.csv')
 
     if errors:
-        print('[FALLÓ] Submission NO válida:')
+        print('[FALLO] Submission NO valida:')
         for e in errors:
-            print(f'  ✗ {e}')
+            print(f'  x {e}')
         return False
 
-    print('[OK] Submission válida:')
-    print(f'     {df.shape[0]} filas × {df.shape[1]} columnas')
+    print('[OK] Submission valida:')
+    print(f'     {df.shape[0]} filas x {df.shape[1]} columnas')
     try:
-        print(f'     Rango: {df.index[0].date()} → {df.index[-1].date()}')
+        print(f'     Rango: {df.index[0].date()} -> {df.index[-1].date()}')
     except Exception:
-        print(f'     Rango: {df.index[0]} → {df.index[-1]}')
+        print(f'     Rango: {df.index[0]} -> {df.index[-1]}')
     for col in INDEX_COLS:
         if col in df.columns:
             print(f'     {col}: min={df[col].min():.2f}  max={df[col].max():.2f}  '
