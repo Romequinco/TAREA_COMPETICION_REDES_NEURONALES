@@ -240,3 +240,39 @@ Si el hackathon entrega datos distintos a los de la tarea:
 6. **Decisión de normalización**: probar primero sin normalización. Si el modelo no
    converge (curvas de train erráticas), considerar StandardScaler — pero verificar en
    val antes de aplicar al test final.
+
+---
+
+## 8. Formato de datos para modelos fundacionales
+
+Los modelos fundacionales (Chronos-2, TimesFM, Kronos...) usan un formato
+DataFrame diferente al de las ventanas deslizantes. Ver `docs/modelos_fundacionales.md`
+para el código completo; aquí el resumen estructural.
+
+```python
+# Formato estándar para la mayoría de modelos fundacionales
+df = pd.DataFrame({
+    'id':        ['AAPL', 'AAPL', 'GOOG', 'GOOG', ...],   # qué activo
+    'timestamp': [pd.Timestamp('2024-01-01'), ...],          # fecha
+    'target':    [150.2, 152.1, 140.0, 141.5, ...],         # lo que predices
+    # Covariables opcionales (solo para modelos que las acepten, ej. Chronos-2):
+    'cov_rsi':   [...],
+    'cov_vol':   [...],
+})
+```
+
+**Diferencias clave con el pipeline custom NN**:
+
+| Aspecto | Custom NN (utils.py) | Modelos fundacionales |
+|---------|---------------------|----------------------|
+| Input | Tensor numpy `(N, V_in, feat)` | DataFrame con columnas id/timestamp/target |
+| Normalización | Depende (ver sección 6) | El modelo la aplica internamente |
+| Split | make_splits() manual | El modelo no necesita split (zero-shot) |
+| Output | Array numpy de predicciones | DataFrame con predicciones + cuantiles |
+
+Para datos de múltiples activos: apilar en el mismo DataFrame con la columna `id`
+distinguiendo cada uno. El modelo predice N días por cada `id` en una sola llamada.
+
+**Escalado de entradas** (aviso del profesor): todas las entradas deben ir ~[0,1]
+o ~[-1,1]. Se puede dar más peso a un input con un rango mayor, pero es inyectar
+conocimiento a priori — si te equivocas, la red pierde tiempo deshaciendo esa elección.

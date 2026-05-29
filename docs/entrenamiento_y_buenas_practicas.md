@@ -1,7 +1,24 @@
 # Entrenamiento y Buenas Prácticas — Síntesis MIAX B3
 
 Síntesis de: `training-nn-2026.md`, `b3_s4_mapa.md`, `redes-neuronales-fundamentos.md`.
-Incluye las reglas derivadas de la tarea previa y el reencuadre competitivo.
+Incluye reglas de la tarea previa, el reencuadre competitivo y la integración con
+modelos fundacionales.
+
+> **Nota**: este documento cubre la Capa 2 (custom NN desde cero). Para la Capa 1
+> (zero-shot con Chronos-2/TimesFM) ver `docs/modelos_fundacionales.md`.
+
+---
+
+## 0. WORKAROUND GPU — LO PRIMERO
+
+RTX 5070 Ti (Blackwell) es incompatible con TensorFlow GPU. **Antes de cualquier
+import de TF/Keras**:
+
+```python
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"   # CPU-only — si no se cuelga
+import tensorflow as tf   # solo después
+```
 
 ---
 
@@ -204,9 +221,23 @@ diversidad.
 
 ---
 
-## 7. Estrategia para el sábado: los dos extremos de Laparra
+## 7. Estrategia completa para el sábado
 
-La estrategia óptima (Laparra, training-nn-2026):
+### Capa 1: modelos fundacionales (primero — objetivo < 30 min)
+
+Ver `docs/modelos_fundacionales.md` para el código completo.
+
+```
+1. GPU workaround (os.environ antes de cualquier import)
+2. Chronos-2 zero-shot → baseline multi-activo con cuantiles
+3. TimesFM zero-shot → comparativa univariada
+4. Comparar ambos con naive y media móvil
+5. Si sobra tiempo: fine-tuning del mejor fundacional
+```
+
+### Capa 2: custom NN desde cero
+
+La estrategia de dos extremos de Laparra (training-nn-2026):
 
 ```
 Camino 1: Simple → Complejo (reducir bias, mejorar train)
@@ -216,16 +247,21 @@ Camino 2: Complejo → Simple (reducir varianza, mejorar val)
   modelo grande que sobreajuste → reducir unidades → reducir capas → añadir dropout
 ```
 
-**Para el hackathon con 4h**: ir directamente al barrido de los 4 modelos con defaults.
-No hay tiempo para la búsqueda iterativa — el `build_model` ya tiene las arquitecturas
-validadas. La búsqueda detallada de arquitectura es para proyectos de semanas.
+En la práctica para 4h: ir directamente al barrido de los 4 modelos con defaults.
+La búsqueda detallada de arquitectura es para proyectos de semanas.
 
-**Secuencia óptima en 4h**:
-1. Ajustar `load_data` y verificar shapes (5 min)
+**Secuencia óptima (Capa 2)**:
+1. GPU workaround + ajustar `load_data`, verificar shapes (5 min)
 2. Prueba rápida: LSTM 50 épocas para verificar pipeline (5 min)
-3. Barrido de 4 modelos × 150–200 épocas (15–30 min según CPU)
-4. Ensemble de 5 seeds del ganador × 300 épocas (30–60 min)
-5. Si sobra tiempo: probar FFD si V_OUT=1, o aumentar seeds a 10
+3. Barrido 4 modelos × 150–200 épocas (15–30 min)
+4. Ensemble 5 seeds del ganador × 300 épocas (30–60 min)
+5. Si sobra: FFD si V_OUT=1, o aumentar seeds a 10
+
+### Decisión final
+
+Comparar MAE de todos los enfoques (fundacional zero-shot, fundacional fine-tuned,
+custom NN simple, custom NN ensemble) y entregar el mejor. No hay jerarquía a priori:
+el zero-shot puede ganar o puede perder según el problema concreto.
 
 ---
 

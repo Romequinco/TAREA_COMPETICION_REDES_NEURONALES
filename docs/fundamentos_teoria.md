@@ -186,10 +186,49 @@ softmax en regresión — truncarían el rango de salida.
 
 ---
 
-## 8. Hardware: el cuello de botella real
+## 8. Modelos Funcionales (Keras Functional API)
+
+El modelo Sequential apila capas en línea recta. La Functional API permite varias
+entradas, varias salidas y ramas en paralelo. Es necesaria cuando los datos tienen
+**dimensionalidades distintas** que no caben en la misma entrada.
+
+Ejemplo del profesor (pizarra): predecir precio con datos de DOS tipos:
+- Serie temporal de precios (forma `(20, 2)`) → entra por una rama con Conv1D o LSTM
+- Indicador económico mensual (escalar) → entra por otra rama con Dense
+
+```python
+from keras import Input, Model
+from keras.layers import Conv1D, GlobalAveragePooling1D, Dense, Concatenate
+
+input_seq = Input(shape=(V_IN, N_FEAT), name='serie')
+x = Conv1D(32, kernel_size=3, activation='relu', padding='same')(input_seq)
+x = GlobalAveragePooling1D()(x)          # colapsa secuencia → vector fijo
+
+input_esc = Input(shape=(N_ESCALARES,), name='indicadores')
+y = Dense(8, activation='relu')(input_esc)
+
+merged = Concatenate()([x, y])           # CONCATENAR, no sumar (dimensiones distintas)
+output = Dense(N_TARGETS)(merged)
+
+model = Model(inputs=[input_seq, input_esc], outputs=output)
+model.fit([X_serie, X_escalares], y_target, ...)  # una X por cada entrada
+```
+
+**Regla clave**: Concatenar (apilar) vs sumar/restar (mezclar).
+Usar sumar/restar solo cuando QUIERES esa operación semántica (ej. diferencia entre
+dos señales). Concatenar es la opción por defecto cuando solo quieres combinar info.
+
+Para guía completa de arquitecturas multi-rama y modelos fundacionales → ver
+`docs/modelos_fundacionales.md`.
+
+---
+
+## 9. Hardware: el cuello de botella real
 
 - La **memoria RAM** es el límite, no la velocidad de procesamiento
 - Backprop necesita mantener todas las activaciones intermedias en memoria
 - CPU con 8 GB RAM: batch_size máximo ≈ 64–128 para estos modelos
+- **RTX 5070 Ti (Blackwell) incompatible con TF GPU** → usar workaround CPU-only
+  (ver `docs/modelos_fundacionales.md`, sección 0)
 
 Para reducir uso de memoria: reducir batch_size, simplificar arquitectura.
