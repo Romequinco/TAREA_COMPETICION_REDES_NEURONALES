@@ -14,16 +14,30 @@ pip install -r requirements.txt
 ```
 ANTES DE EMPEZAR (5 min, juntos):
   1. Soltar el CSV en data/
-  2. Leer el enunciado y rellenar el checklist del notebook
-  3. Acordar V_IN, V_OUT, FFD_D → editar en utils.py (una sola vez)
+  2. Leer el enunciado → rellenar el checklist del notebook
+  3. Acordar V_IN, V_OUT, FFD_D → editar en utils.py (una sola vez, todos usan los mismos)
 
-TRABAJO PARALELO (cada uno):
-  4. Abrir exp_oscar.ipynb / exp_dani.ipynb / exp_fernando.ipynb
-  5. Ejecutar secciones 0-7 completas
-  6. Sección 7 exporta models/<nombre>.keras + results/<nombre>.json
+TRABAJO PARALELO — cada uno en su exp_*.ipynb:
+  § 0   Diagnóstico automático del dataset
+  § 1   Configuración (constantes de datos de utils.py + parámetros personales)
+  § 2   Ventanas deslizantes + split temporal
+  § 3   Cribado rápido: 4 arquitecturas custom (dense / lstm / cnn1d / cnn_lstm)
+  § 4   Entrenamiento completo de los mejores candidatos
+  § 5   Ensemble de semillas del ganador
+  § 6   Tabla de resultados → compartir números con el equipo
+  § 8   Experimentos adicionales (opcional, si queda tiempo):
+          - Transformers: PatchTST, iTransformer  (docs/transformers_y_huggingface.md)
+          - Fundacionales: Chronos-2, TimesFM, Kronos  (docs/modelos_fundacionales.md)
+          - Funcional multi-rama si hay covariables escalares
+          - Buscar en HuggingFace Hub modelos de forecasting financiero
+        → Rellenar tabla A/B/C y decidir qué modelo exportar
+  § 7   Exportar 1 modelo: models/<nombre>.keras + results/<nombre>.json
+          (por defecto: ganador de §4; si §8 dio algo mejor → ejecutar
+           primero "Decisión final" de §8 para cambiar mejor_modelo)
 
 SÍNTESIS FINAL:
-  7. Abrir COMPETICION.ipynb → carga los 3 modelos → ensemble automático
+  Abrir COMPETICION.ipynb → verifica compatibilidad → ensemble automático → MAE entregable
+  (Si algo falla: sección de fallback manual ya documentada)
 ```
 
 ## Ficheros clave
@@ -38,7 +52,19 @@ SÍNTESIS FINAL:
 | `models/` | Modelos exportados (`oscar.keras`, `dani.keras`, `fernando.keras`) |
 | `results/` | JSONs de config y MAE de cada miembro |
 | `CLAUDE.md` | Contexto completo: palancas de mejora, reglas de oro, API de utils.py |
-| `docs/resumen_tarea.md` | Referencia de la tarea previa (arquitecturas, resultados numéricos) |
+| `docs/` | Documentación técnica (ver tabla abajo) |
+| `notebooks_tarea/tarea_previa/` | Notebooks originales 00–08 de la tarea anterior (referencia) |
+
+## Documentación de contexto (`docs/`)
+
+| Fichero | Cuándo consultar |
+|---------|-----------------|
+| `modelos_fundacionales.md` | **Primero** — zero-shot Chronos-2/TimesFM, transfer learning, modelo funcional, GPU workaround |
+| `transformers_y_huggingface.md` | PatchTST, iTransformer, cómo buscar y cargar modelos de HuggingFace Hub |
+| `entrenamiento_y_buenas_practicas.md` | Callbacks, diagnóstico de curvas, ensemble de seeds, lo que no funciona |
+| `preprocesado_y_datos.md` | Log-retornos, split temporal, FFD(d=0.2) por horizonte, qué normalización destruye |
+| `fundamentos_teoria.md` | Funciones de coste, optimizadores, lr empírico vs teórico, Functional API |
+| `resumen_tarea.md` | 256 experimentos de la tarea previa, MAE de referencia, errores a no repetir |
 
 ## Regla crítica
 
