@@ -164,6 +164,41 @@ TAREA_COMPETICION_REDES_NEURONALES/
 - **Ancla de reconstrucción:** `precio_inicial` = `train_indices[col].iloc[-1]` para todos los índices, en todos los notebooks.
 - **CLIP_LOGRET = 0.5** — `predict_autoregressive` recorta cada log-ret a ±0.5 antes de acumularlo. Salvaguarda anti-divergencia activa por defecto. Si el clip se activa el modelo ya es malo.
 
+### Esquema completo de `results/index_X.json`
+
+```json
+{
+  "index":              "Index_X",
+  "owner":              "nombre",
+  "approach_type":      "nn" | "nn_ensemble" | "baseline_flat" | "baseline_drift" | "baseline_rw" | "ghost",
+  "strategy":           "descripción breve del enfoque ganador",
+  "rmse_backtest_252d": 12345.67,
+  "model_path":         "models/owner_Index_X.keras" | null,
+  "log_ret_mode":       true | false,
+  "v_in":               20 | null,
+  "n_features":         1,
+  "aux_source":         "train_macro" | "train_network" | null,
+  "aux_test_source":    "test_macro"  | "test_network"  | null,
+  "aux_columns":        ["col1", "col2"] | null,
+  "ghost_source_index": "Index_X" | null,
+  "ghost_lag":          5 | null,
+  "notes":              "texto libre"
+}
+```
+
+**Campos nuevos (añadidos 2026-05-29) — necesarios para el rollout de 09:**
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `n_features` | int | Canales de entrada del modelo: `1` = solo precio; `1+k` con aux. Siempre 1 para non-NN. |
+| `aux_source` | str\|null | Clave en `data` del aux de train (`"train_macro"` / `"train_network"` / `null`). |
+| `aux_test_source` | str\|null | Clave en `data` del aux de test para el rollout productivo. |
+| `aux_columns` | list\|null | Nombres exactos de columnas aux **en el mismo orden** en que se concatenaron al entrenar. |
+
+**Regla de derivación en notebooks de índice:**
+- Si `approach in ('nn', 'nn_ensemble')` y se usaron features auxiliares: `n_features = int(X.shape[2])`, rellenar `aux_*` según el dataset.
+- Si approach es baseline/ghost, o NN sin aux: `n_features=1`, los tres campos `aux_*` a `null`.
+- `09_consolidacion` usa `info.get('n_features', 1)` para ser retrocompatible con JSONs anteriores.
+
 ---
 
 ## API de utils.py
@@ -202,6 +237,70 @@ train_model(model, X[:cut], y[:cut], X[cut:], y[cut:])
 bt = backtest_autoregressive(lambda x: model.predict(x, verbose=0).ravel()[0],
                              serie, log_ret_mode=True)   # RMSE en precios
 ```
+
+---
+
+## Deuda técnica y TODOs pendientes (sábado)
+
+### 1. PLACEHOLDER de features auxiliares — `05_index_C` y `08_index_F`
+
+**Qué es.** `MACRO_FEATURES` y `NET_FEATURES` están inicializados a `list(data['train_*'].columns)` = **todas las columnas**. Es un placeholder seguro para que el código funcione de inicio a fin, pero no es la selección óptima.
+
+**Dónde.** `05_index_C.ipynb` celda `c03` línea `MACRO_FEATURES = ...` y `08_index_F.ipynb` celda `c03` línea `NET_FEATURES = ...`.
+
+**Qué hacer.** Tras ejecutar `00_carga_y_EDA.ipynb` y ver las correlaciones, editar esa línea con las columnas realmente útiles (p.ej. `MACRO_FEATURES = ['Crude_Vitality', 'Capital_Cost_Index']`). El JSON (`aux_columns`) y el notebook 09 se ajustan automáticamente: no hay que tocar nada más.
+
+**Nota.** El EDA ejecutado en sesión previa ya mostró: macro → Crude_Vitality (0.363), Capital_Cost_Index (0.170), Lumina_Reserve (0.090); network → ambas cols con 0.537 idéntico (misma señal, distinta escala). Las 3 macro y las 2 network son candidatas razonables.
+
+---
+
+### 2. GAP de macro en test — decisión de relleno pendiente
+
+**Qué es.** `test_macro_factors.csv` tiene **173 filas** (días hábiles) para un horizonte de **252 días naturales**: faltan ~79 días sin datos macro.
+
+**Dónde.** `09_consolidacion.ipynb` celda de rollout (`c05`), rama `n_features > 1` para Index_C.
+
+**Qué hacer.** El notebook aplica `ffill` por defecto e imprime `⚠️ faltan N días → rellenando con ffill`. Confirmar mañana si esa estrategia es adecuada o cambiarla (opciones: `ffill`, `bfill`, `zero`, `mean`). Ver la celda de aviso con la tabla de opciones justo encima de c05.
+
+**Importante.** Index_F (network) NO tiene este problema: `test_network_metrics.csv` ya tiene las 252 filas.
+
+---
+
+### 3. TODO sentiment — `02_sentiment_news.ipynb`
+
+**Qué es.** `TEXT_COL = '?'` está sin rellenar.
+
+**Dónde.** `02_sentiment_news.ipynb` celda `c04`.
+
+**Qué hacer.** Poner `TEXT_COL = 'Headline'` (nombre real de la columna de texto, verificable con `print(train_news.columns)` en celda `c02`). Notebook de baja prioridad — solo ejecutar si el EDA muestra correlación y hay tiempo.
+
+---
+
+### 4. TODO Ghost — valores ya encontrados, trasladar a `06_index_D`
+
+**Qué es.** `GHOST_SOURCE` y `GHOST_LAG` están rellenados en `00_carga_y_EDA` pero hay que copiarlos manualmente a `06_index_D.ipynb`.
+
+**Dónde.** `00_carga_y_EDA.ipynb` celda `c07` (decisión ya tomada: `Index_A`, lag=1). `06_index_D.ipynb` celda `c03` (tiene `GHOST_SOURCE = 'Index_?'`, `GHOST_LAG = 0` como placeholders).
+
+**Qué hacer.** En `06_index_D.ipynb` celda `c03`, editar: `GHOST_SOURCE = 'Index_A'` y `GHOST_LAG = 1`. Confirmar visualmente con la celda `c04` antes de correr el backtest.
+
+---
+
+### 5. `test_dates.csv` — pendiente de recibir
+
+**Qué es.** El fichero con las 252 fechas del período de predicción todavía no existe.
+
+**Dónde.** `data/test_dates.csv`. Lo referencia `09_consolidacion.ipynb` celda `c06` para validar que las fechas de las predicciones coinciden con el template Excel.
+
+**Qué hacer.** Al recibirlo, colocarlo en `data/` sin renombrar. El notebook 09 lo detecta automáticamente y valida contra el template. Si no llega, la celda `c06` avisa pero no para: la validación de fechas queda omitida (riesgo bajo si se confía en que el template es la referencia).
+
+---
+
+### 6. Limpieza de `utils.py` — POST-competición, NO el sábado
+
+**Qué es.** `utils.py` contiene funciones de tareas anteriores (MAE, no autorregresiva) que ya no se usan en este pipeline.
+
+**Qué hacer.** Nada el sábado. Limpieza post-competición. Se dejó intencionadamente para no arriesgar el núcleo funcional antes del hackathon. Marcado aquí como recordatorio.
 
 ---
 
