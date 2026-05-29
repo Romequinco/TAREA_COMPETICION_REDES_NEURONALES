@@ -88,6 +88,7 @@ TAREA_COMPETICION_REDES_NEURONALES/
 | Fichero | Qué contiene | Cuándo consultar |
 |---------|-------------|-----------------|
 | `docs/modelos_fundacionales.md` | Zero-shot con Chronos-2/TimesFM, catálogo de modelos, transfer learning, functional API, GPU workaround | **Primero** — estrategia principal del hackathon |
+| `docs/transformers_y_huggingface.md` | Arquitecturas transformer para TS (PatchTST, iTransformer…), cómo buscar modelos en HuggingFace Hub, cuándo usar cada familia | Para experimentos más allá del flujo estándar |
 | `docs/entrenamiento_y_buenas_practicas.md` | Loop custom NN, callbacks, diagnóstico curvas (6 patrones), ensemble de seeds, lo que no funciona | Durante el entrenamiento custom |
 | `docs/preprocesado_y_datos.md` | Log-retornos, split temporal, ventanas deslizantes, FFD(d=0.2) por horizonte, qué normalización destruye | Al configurar los datos |
 | `docs/fundamentos_teoria.md` | Los 4 componentes ML, funciones de coste, optimizadores, lr empírico vs teórico, Functional API | Para justificar decisiones de diseño |
@@ -140,7 +141,19 @@ Probar los 4 siempre; quedarse con el mejor antes del ensemble:
 | `cnn1d` | 3e-4 | captura patrones locales |
 | `cnn_lstm` | 3e-4 | híbrido |
 
-### 5. Modelo funcional (si hay datos de distinta naturaleza)
+### 5. Transformer especializado (PatchTST / iTransformer)
+Series largas o muchos activos correlacionados → más potente que LSTM.
+Buscar checkpoints preentrenados en HuggingFace antes de entrenar desde cero.
+Ver `docs/transformers_y_huggingface.md`.
+
+```python
+# Buscar modelos de forecasting en HuggingFace
+from huggingface_hub import list_models
+modelos = list(list_models(task='time-series-forecasting', sort='downloads', limit=10))
+for m in modelos: print(m.modelId, m.downloads)
+```
+
+### 6. Modelo funcional (si hay datos de distinta naturaleza)
 Si el enunciado da series + indicadores escalares → arquitectura multi-rama.
 Ver sección 6 de `docs/modelos_fundacionales.md`.
 
