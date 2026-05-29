@@ -121,9 +121,18 @@ un assert; un aux desalineado produce un RMSE falso silenciosamente).
 
 ## 6. Reparto del equipo
 
-- **Oscar** — infra + validación + entrega (`utils.py`, backtest, submission, `COMPETICION.ipynb`).
-- **Miembro 2** — baselines + defensivos (B, E) + Ghost (D).
-- **Miembro 3** — volátiles A y F (los que pesan) + features macro (C) y network (F) + ensembles.
+- **Oscar** — infra + validación + entrega: `00_carga_y_EDA`, `01_baselines`, `09_consolidacion`.
+- **Miembro 2** — defensivos + Ghost: `04_index_B`, `07_index_E`, `06_index_D`.
+- **Miembro 3** — volátiles + auxiliares: `03_index_A`, `08_index_F`, `05_index_C`.
 
-Cada uno trabaja en su `exp_*.ipynb`; la consolidación recoge el mejor enfoque por índice
-venga del notebook que venga.
+Cada notebook de índice (03-08) guarda su propio `results/index_X.json`. La consolidación solo lee.
+
+---
+
+## 7. Detalles del enunciado oficial
+
+- **Nota**: 90% del valor viene del **ranking** entre equipos, no de superar el umbral. Aprobar (RMSE < 75 000) no es suficiente para buena nota — hay que escalar en el ranking.
+- **Fechas desplazadas**: el enunciado advierte que *"todas las fechas han sido desplazadas"*. Esto afecta principalmente al notebook `02_sentiment_news`: el alineamiento temporal news↔precio puede ser incorrecto, convirtiendo el sentiment en ruido. Usar con cautela.
+- **Entrega**: el formato de entrega es un **Excel** en el que se copian y pegan los 252 filas × 6 columnas de valores numéricos. El notebook `09_consolidacion` tiene dos fallbacks: `df_pred.to_clipboard(index=False)` (pegar directo en Excel) y `df_pred.to_csv(index=False)` (para copiar a mano).
+- **Intentos**: solo **6 entregas** permitidas. Una entrega idéntica a otra ya enviada no cuenta. Ejecutar `validar_submission` antes de cada subida.
+- **Presentación**: los **top 3 equipos** presentan sus resultados el **4 de junio**.

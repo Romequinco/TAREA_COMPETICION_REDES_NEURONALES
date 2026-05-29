@@ -92,28 +92,24 @@ gestionan `predict_autoregressive` y `backtest_autoregressive` automáticamente
 ```
 ANTES DE EMPEZAR (5 min, todos):
   1. Soltar los CSV en data/
-  2. Leer el enunciado y rellenar el diagnóstico (celda 3 del notebook)
+  2. Ejecutar 00_carga_y_EDA.ipynb — diagnóstico + detective (Ghost, macro-C, network-F)
   3. Acordar V_IN_SHARED viendo las series reales → editar UNA VEZ en utils.py
 
-TRABAJO PARALELO (cada uno en su exp_*.ipynb):
-  4. GPU workaround (celda 1, siempre)
-  5. Carga + diagnóstico + baselines (celdas 3-4): asegurar el aprobado
-  6. Pistas (celda 5) + un modelo por índice (celda 6) + ensemble (celda 7)
-  7. Backtest 252d SIEMPRE → guardar mejor enfoque por índice (celda 8)
+TRABAJO PARALELO (cada miembro en sus notebooks asignados):
+  4. 01_baselines.ipynb — baselines para los 6 índices → results/baselines.json
+  5. Notebooks de índice (03-08) — un notebook por índice, OWNER = "nombre" al inicio
+     Cada uno guarda results/index_X.json (UNA SOLA FUENTE DE VERDAD)
+  6. Backtest 252d SIEMPRE antes de guardar el JSON
 
-SÍNTESIS FINAL (COMPETICION.ipynb):
-  8. Recoger el mejor enfoque de cada índice (venga del notebook que venga)
-  9. Construir el vector 252×6, validar formato, reportar RMSE de backtest
-  10. Generar el CSV. Si algo falla: sección de fallback manual.
+SÍNTESIS FINAL:
+  7. 09_consolidacion.ipynb — lee los 6 JSON, genera df 252×6, validar, CSV
+     Fallback manual: df_pred.to_clipboard() → pegar en Excel del profesor
 ```
 
 ### Reparto sugerido
-- **Oscar** — infra + validación + entrega: `utils.py`, `backtest_autoregressive`,
-  `generar_submission` / `validar_submission`, consolidación en `COMPETICION.ipynb`.
-- **Miembro 2** — baselines + índices defensivos + Ghost: B (plano), E, y cazar el
-  lag de D con `lagged_correlation`.
-- **Miembro 3** — volátiles con datos auxiliares: A y F (los que dominan el RMSE),
-  features de macro (C) y network (F), ensembles de semillas.
+- **Oscar** — infra + validación + entrega: `utils.py`, `00_carga_y_EDA`, `01_baselines`, `09_consolidacion`.
+- **Miembro 2** — índices defensivos + Ghost: `04_index_B`, `07_index_E`, `06_index_D`.
+- **Miembro 3** — volátiles + datos auxiliares: `03_index_A`, `08_index_F`, `05_index_C`.
 
 ---
 
@@ -143,19 +139,30 @@ SÍNTESIS FINAL (COMPETICION.ipynb):
 
 ```
 TAREA_COMPETICION_REDES_NEURONALES/
-├── CLAUDE.md                 ← este fichero
-├── utils.py                  ← fontanería + CONSTANTES COMPARTIDAS
-├── exp_TEMPLATE.ipynb        ← plantilla (no editar; copiar a exp_TUNOMBRE.ipynb)
-├── exp_oscar.ipynb           ← notebook personal Oscar
-├── exp_dani.ipynb            ← notebook personal Dani
-├── exp_fernando.ipynb        ← notebook personal Fernando
-├── COMPETICION.ipynb         ← entregable: consolidación por índice + CSV final
-├── models/                   ← modelos exportados (<owner>_<Index>.keras)
-├── results/                  ← JSONs por miembro (config + RMSE de backtest por índice)
-├── data/                     ← soltar los CSV aquí el sábado
-├── docs/                     ← documentación de contexto (ver tabla abajo)
-└── notebooks_tarea/          ← notebooks de la tarea previa (referencia histórica)
+├── CLAUDE.md                   ← este fichero
+├── utils.py                    ← fontanería + CONSTANTES COMPARTIDAS (NO tocar)
+├── 00_carga_y_EDA.ipynb        ← diagnóstico + DETECTIVE (Ghost, macro-C, network-F)
+├── 01_baselines.ipynb          ← flat/drift/rw → results/baselines.json
+├── 02_sentiment_news.ipynb     ← ⚠️ BAJA PRIORIDAD — sentiment con transformer
+├── 03_index_A.ipynb            ← Alpha-Tech (ALTO esfuerzo, LSTM+ensemble)
+├── 04_index_B.ipynb            ← Steady-State (BAJO esfuerzo, baseline plano)
+├── 05_index_C.ipynb            ← Energy-Pulse (MEDIO, LSTM+macro)
+├── 06_index_D.ipynb            ← The Ghost (BAJO-MEDIO, detective+lag)
+├── 07_index_E.ipynb            ← Global-ESG (MEDIO, LSTM o baseline)
+├── 08_index_F.ipynb            ← Digital-Frontier (ALTO esfuerzo, LSTM+network)
+├── 09_consolidacion.ipynb      ← lee 6 JSON → df 252×6 → CSV → validar
+├── models/                     ← modelos exportados ({owner}_{Index}.keras)
+├── results/                    ← baselines.json + index_A…F.json
+├── data/                       ← soltar los CSV aquí el sábado
+└── docs/                       ← documentación de contexto (ver tabla abajo)
 ```
+
+### Contrato entre notebooks — una fuente de verdad por JSON
+- `01_baselines.ipynb` escribe SOLO `results/baselines.json`.
+- Cada `results/index_X.json` lo escribe EXCLUSIVAMENTE `0X_index_X.ipynb`, incluso si el approach ganador es un baseline.
+- `09_consolidacion.ipynb` **solo lee** los JSON — nunca los escribe.
+- **Ancla de reconstrucción:** `precio_inicial` = `train_indices[col].iloc[-1]` para todos los índices, en todos los notebooks.
+- **CLIP_LOGRET = 0.5** — `predict_autoregressive` recorta cada log-ret a ±0.5 antes de acumularlo. Salvaguarda anti-divergencia activa por defecto. Si el clip se activa el modelo ya es malo.
 
 ---
 

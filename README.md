@@ -1,6 +1,6 @@
-# Hackathon — Predicción de Retornos de Activos
+# Hackathon — Predicción autorregresiva de 6 índices financieros
 
-Base para el hackathon de redes neuronales (regresión de retornos, Keras/TF).  
+Predicción día a día de 6 índices (252 pasos autorregresivos), métrica RMSE promedio.  
 **Equipo**: Oscar · Dani · Fernando
 
 ## Arranque rápido
@@ -12,86 +12,57 @@ pip install -r requirements.txt
 ## Flujo del equipo (sábado)
 
 ```
-ANTES DE EMPEZAR (5 min, juntos):
-  1. Soltar el CSV en data/
-  2. Leer el enunciado → rellenar el checklist del notebook
-  3. Acordar V_IN, V_OUT, FFD_D → editar en utils.py (una sola vez, todos usan los mismos)
+ANTES DE EMPEZAR (5 min, todos):
+  1. Soltar los CSV en data/
+  2. Ejecutar 00_carga_y_EDA.ipynb — diagnóstico y detective (Ghost lag, macro-C, network-F)
+  3. Acordar V_IN_SHARED viendo las series reales → editar UNA VEZ en utils.py
 
-TRABAJO PARALELO — cada uno en su exp_*.ipynb:
-  § 0   Diagnóstico automático del dataset
-  § 1   Configuración (constantes de datos de utils.py + parámetros personales)
-  § 2   Ventanas deslizantes + split temporal
-  § 3   Cribado rápido: 4 arquitecturas custom (dense / lstm / cnn1d / cnn_lstm)
-  § 4   Entrenamiento completo de los mejores candidatos
-  § 5   Ensemble de semillas del ganador
-  § 6   Tabla de resultados → compartir números con el equipo
-  § 8   Experimentos adicionales (opcional, si queda tiempo):
-          - Transformers: PatchTST, iTransformer  (docs/transformers_y_huggingface.md)
-          - Fundacionales: Chronos-2, TimesFM, Kronos  (docs/modelos_fundacionales.md)
-          - Funcional multi-rama si hay covariables escalares
-          - Buscar en HuggingFace Hub modelos de forecasting financiero
-        → Rellenar tabla A/B/C y decidir qué modelo exportar
-  § 7   Exportar 1 modelo: models/<nombre>.keras + results/<nombre>.json
-          (por defecto: ganador de §4; si §8 dio algo mejor → ejecutar
-           primero "Decisión final" de §8 para cambiar mejor_modelo)
+TRABAJO PARALELO:
+  4. 01_baselines.ipynb — baselines para los 6 índices (asegurar el aprobado)
+  5. Notebooks de índice (03-08) — OWNER = "nombre" al inicio de cada uno
+     Cada uno guarda results/index_X.json (única fuente de verdad por índice)
 
 SÍNTESIS FINAL:
-  Abrir COMPETICION.ipynb → verifica compatibilidad → ensemble automático → MAE entregable
-  (Si algo falla: sección de fallback manual ya documentada)
+  6. 09_consolidacion.ipynb — lee los 6 JSON, genera 252×6, valida, CSV de entrega
+     Fallback: df_pred.to_clipboard() → pegar en Excel del profesor
 ```
 
 ## Ficheros clave
 
 | Fichero | Descripción |
 |---------|-------------|
-| `utils.py` | Funciones compartidas + **constantes de datos** (`FILEPATH_SHARED`, `V_IN_SHARED`, `V_OUT_SHARED`…) |
-| `exp_oscar.ipynb` | Notebook personal Oscar: cribado → entreno → ensemble → exportar modelo |
-| `exp_dani.ipynb` | Notebook personal Dani |
-| `exp_fernando.ipynb` | Notebook personal Fernando |
-| `COMPETICION.ipynb` | Entregable final: carga los 3 modelos, verifica compatibilidad, ensemble automático |
-| `models/` | Modelos exportados (`oscar.keras`, `dani.keras`, `fernando.keras`) |
-| `results/` | JSONs de config y MAE de cada miembro |
-| `CLAUDE.md` | Contexto completo: palancas de mejora, reglas de oro, API de utils.py |
-| `docs/` | Documentación técnica (ver tabla abajo) |
-| `notebooks_tarea/tarea_previa/` | Notebooks originales 00–08 de la tarea anterior (referencia) |
+| `utils.py` | Funciones compartidas + **constantes** (`V_IN_SHARED`, `VAL_DAYS`, `RANDOM_SEED`…) |
+| `00_carga_y_EDA.ipynb` | Diagnóstico + DETECTIVE: Ghost lag, correlación macro-C, network-F |
+| `01_baselines.ipynb` | Flat/drift/random_walk → `results/baselines.json` |
+| `02_sentiment_news.ipynb` | ⚠️ Baja prioridad — sentiment con FinBERT/multilingüe |
+| `03_index_A.ipynb` | Alpha-Tech — ALTO esfuerzo, LSTM + ensemble |
+| `04_index_B.ipynb` | Steady-State — BAJO esfuerzo, baseline plano |
+| `05_index_C.ipynb` | Energy-Pulse — MEDIO, LSTM + macro_factors |
+| `06_index_D.ipynb` | The Ghost — BAJO-MEDIO, detective + replicar índice fuente con lag |
+| `07_index_E.ipynb` | Global-ESG — MEDIO, LSTM o baseline |
+| `08_index_F.ipynb` | Digital-Frontier — ALTO esfuerzo, LSTM + network_metrics |
+| `09_consolidacion.ipynb` | Lee 6 JSON → df 252×6 → validar → CSV final + fallback manual |
+| `models/` | Modelos exportados (`{owner}_{Index}.keras`) |
+| `results/` | `baselines.json` + `index_A…F.json` (schema acordado) |
+
+## Regla crítica
+
+Las constantes de `utils.py` se acuerdan **una vez al inicio** y nadie las cambia en su notebook.
+Cada `results/index_X.json` lo escribe **exclusivamente** el notebook de ese índice.
+`09_consolidacion.ipynb` solo lee — nunca escribe JSON de índice.
+
+## Stack
+
+Python 3.11 · Keras/TensorFlow (CPU-only, workaround RTX 5070 Ti) · pandas · numpy
 
 ## Documentación de contexto (`docs/`)
 
 | Fichero | Cuándo consultar |
 |---------|-----------------|
-| `modelos_fundacionales.md` | **Primero** — zero-shot Chronos-2/TimesFM, transfer learning, modelo funcional, GPU workaround |
-| `transformers_y_huggingface.md` | PatchTST, iTransformer, cómo buscar y cargar modelos de HuggingFace Hub |
-| `entrenamiento_y_buenas_practicas.md` | Callbacks, diagnóstico de curvas, ensemble de seeds, lo que no funciona |
-| `preprocesado_y_datos.md` | Log-retornos, split temporal, FFD(d=0.2) por horizonte, qué normalización destruye |
-| `fundamentos_teoria.md` | Funciones de coste, optimizadores, lr empírico vs teórico, Functional API |
-| `resumen_tarea.md` | 256 experimentos de la tarea previa, MAE de referencia, errores a no repetir |
-
-## Regla crítica
-
-Las constantes `FILEPATH_SHARED`, `V_IN_SHARED`, `V_OUT_SHARED`, `FFD_D_SHARED` de `utils.py`
-se acuerdan entre los 3 al inicio y **nadie las cambia en su notebook personal**.
-Cambiarlas invalida el ensemble porque los splits dejan de ser los mismos.
-
-## Familias de modelos disponibles
-
-| Familia | Cómo | Dónde |
-|---------|------|-------|
-| Dense / LSTM / CNN / CNN+LSTM | `build_model(tipo, ...)` | `utils.py` + secciones 3-5 de cada notebook |
-| Fundacionales zero-shot | Chronos-2, TimesFM | `docs/modelos_fundacionales.md` |
-| Transformers especializados | PatchTST, iTransformer | `docs/transformers_y_huggingface.md` |
-| HuggingFace Hub (búsqueda) | `list_models(task='time-series-forecasting')` | `docs/transformers_y_huggingface.md` |
-| Funcional multi-rama | Keras Functional API | `docs/modelos_fundacionales.md` §6 |
-
-## Palancas principales
-
-1. **Ensemble de los 3 modelos** (`COMPETICION.ipynb`) — diversidad entre miembros reduce varianza
-2. **Ensemble de semillas** (`train_ensemble`, `n_seeds=5`) — reduce ruido de inicialización
-3. **FFD(d=0.2)** en `load_data(ffd_d=0.2)` — −8.9 % MAE, **solo para V_out=1**
-4. Barrido de los 4 modelos: `dense`, `lstm`, `cnn1d`, `cnn_lstm`
-5. Buscar en HuggingFace si sobra tiempo: `huggingface.co/models?pipeline_tag=time-series-forecasting`
-
-Ver `CLAUDE.md` para instrucciones detalladas.
-
-## Stack
-
-Python 3.11/3.12 · Keras 3.x (backend TensorFlow) · CPU-only (workaround RTX 5070 Ti)
+| `problema_autoregresivo.md` | **Primero** — spec del problema, playbook por índice, detalles del enunciado oficial |
+| `modelos_fundacionales.md` | Zero-shot Chronos-2/TimesFM, GPU workaround |
+| `transformers_y_huggingface.md` | PatchTST, iTransformer, HuggingFace Hub |
+| `entrenamiento_y_buenas_practicas.md` | Callbacks, ensemble de seeds, diagnóstico de curvas |
+| `preprocesado_y_datos.md` | Log-retornos, split temporal, FFD |
+| `fundamentos_teoria.md` | Funciones de coste, optimizadores, lr |
+| `resumen_tarea.md` | Tarea previa (MAE, no autorregresiva) — referencia histórica |
