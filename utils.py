@@ -22,6 +22,19 @@ OUTPUT_WINDOWS = [1,  5, 30, 90]   # días de salida
 RANDOM_SEED    = 42
 N_ASSETS       = 23
 
+# ── CONSTANTES COMPARTIDAS DE DATOS ──────────────────────────────────────────
+# ⚠️  CRÍTICO: estos valores se acuerdan entre los 3 miembros del equipo al
+#    empezar el hackathon y NADIE los cambia en su notebook personal.
+#    Cada uno experimenta solo con arquitectura e hiperparámetros de modelo.
+#    Cambiar FILEPATH / V_IN / V_OUT / FFD_D invalida el ensemble del equipo
+#    porque los splits ya no serán los mismos.
+FILEPATH_SHARED    = 'data/precios.csv'
+V_IN_SHARED        = 10
+V_OUT_SHARED       = 1
+FFD_D_SHARED       = None
+PRICE_COLS_SHARED  = None   # None = todas las columnas numéricas como precios
+RETURN_COLS_SHARED = None   # None = calcular retornos desde precios
+
 
 # ── DATOS ─────────────────────────────────────────────────────────────────────
 def create_time_series_data(data, V_in, V_out):

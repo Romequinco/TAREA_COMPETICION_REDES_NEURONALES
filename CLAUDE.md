@@ -40,16 +40,25 @@ CAPA 2 — Custom NN desde cero (complementario / si el enunciado lo pide)
 
 ---
 
-## Flujo de trabajo rápido
+## Flujo de trabajo del equipo (3 miembros)
 
 ```
-1. Soltar CSV en data/
-2. WORKAROUND GPU (línea os.environ antes de cualquier import)
-3. Zero-shot Chronos-2 → baseline en minutos
-4. Comparar con TimesFM y con naive
-5. Abrir entrenamiento.ipynb → barrido custom NN
-6. Ensemble del mejor modelo custom NN
-7. Comparar todas las apuestas → escoger la mejor
+ANTES DE EMPEZAR (5 min, todo el equipo):
+  1. Soltar CSV en data/
+  2. Leer el enunciado completo y rellenar el checklist del notebook
+  3. Acordar V_IN, V_OUT, FFD_D, PRICE_COLS → editar esas constantes en utils.py
+     (una sola vez, todos usan los mismos valores)
+
+TRABAJO PARALELO (cada uno en su exp_*.ipynb):
+  4. GPU workaround — primera celda, siempre
+  5. Sección 0: diagnosticar el dataset
+  6. Secciones 1-6: cribado rápido → entreno completo → ensemble de semillas
+  7. Sección 7: exportar models/<nombre>.keras + results/<nombre>.json
+
+SÍNTESIS FINAL (COMPETICION.ipynb):
+  8. Cargar los 3 modelos y verificar compatibilidad de shapes
+  9. Tabla comparativa de los 3 → ensemble automático → MAE entregable
+  10. Si el ensemble falla: usar la sección de fallback manual
 ```
 
 ---
@@ -59,8 +68,14 @@ CAPA 2 — Custom NN desde cero (complementario / si el enunciado lo pide)
 ```
 TAREA_COMPETICION_REDES_NEURONALES/
 ├── CLAUDE.md                        ← este fichero
-├── utils.py                         ← custom NN: modelos, entrenamiento, evaluación
-├── entrenamiento.ipynb              ← notebook custom NN (Capa 2)
+├── utils.py                         ← funciones compartidas + CONSTANTES DE DATOS
+├── exp_TEMPLATE.ipynb               ← plantilla de referencia (no editar)
+├── exp_oscar.ipynb                  ← notebook personal Oscar
+├── exp_dani.ipynb                   ← notebook personal Dani
+├── exp_fernando.ipynb               ← notebook personal Fernando
+├── COMPETICION.ipynb                ← entregable final: ensemble de los 3
+├── models/                          ← modelos exportados: oscar.keras, dani.keras, fernando.keras
+├── results/                         ← JSONs de config y MAE: oscar.json, dani.json, fernando.json
 ├── data/                            ← soltar el CSV aquí al llegar
 ├── docs/                            ← documentación de contexto (ver abajo)
 └── notebooks_tarea/tarea_previa/    ← notebooks de la tarea previa (referencia)
@@ -145,6 +160,7 @@ Congelar primeras capas, reentrenar solo el final. Ver niveles 1-3 en
 6. **FFD solo para V_out=1** — para horizontes largos usa retornos crudos
 7. **Mirar cuantiles de los fundacionales** — intervalo ancho = predicción poco fiable
 8. **Comparar con baselines clásicos** — naive, media móvil antes de celebrar
+9. **El split de datos es sagrado y común** — `FILEPATH_SHARED`, `V_IN_SHARED`, `V_OUT_SHARED`, `FFD_D_SHARED` se acuerdan UNA VEZ en `utils.py` al inicio y **nadie los cambia en su notebook**; cada uno solo varía arquitectura e hiperparámetros. Cambiarlos invalida el ensemble porque los splits ya no son los mismos.
 
 ---
 
@@ -162,6 +178,18 @@ Diferencias entre arquitecturas NN: Δtest < 0.0001. Real, consistente, y es don
 ---
 
 ## API de utils.py (custom NN)
+
+### Constantes de datos compartidas (editar al inicio del hackathon)
+```python
+FILEPATH_SHARED    = 'data/precios.csv'   # ← ajustar con el CSV real
+V_IN_SHARED        = 10                   # ← ajustar según enunciado
+V_OUT_SHARED       = 1                    # ← ajustar según enunciado
+FFD_D_SHARED       = None                 # ← 0.2 solo si V_OUT=1
+PRICE_COLS_SHARED  = None                 # ← lista si no todas las columnas son precios
+RETURN_COLS_SHARED = None                 # ← lista si el CSV ya trae retornos
+```
+
+### Funciones
 
 | Función | Firma resumida | Uso |
 |---------|---------------|-----|
