@@ -1,0 +1,17 @@
+{
+  "index": "Index_B",
+  "owner": "dani",
+  "approach_type": "nn_ensemble",
+  "strategy": "lstm",
+  "rmse_backtest_252d": 17088.154911024078,
+  "model_path": "models/dani_Index_B.keras",
+  "log_ret_mode": true,
+  "v_in": 20,
+  "n_features": 1,
+  "aux_source": null,
+  "aux_test_source": null,
+  "aux_columns": null,
+  "ghost_source_index": null,
+  "ghost_lag": null,
+  "notes": "Ensemble 3-seed LSTM (log-ret) bati\u00f3 al baseline en backtest 252d."
+}

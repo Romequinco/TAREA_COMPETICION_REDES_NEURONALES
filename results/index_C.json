@@ -1,0 +1,17 @@
+{
+  "index": "Index_C",
+  "owner": "dani",
+  "approach_type": "baseline_flat",
+  "strategy": "flat",
+  "rmse_backtest_252d": 8804.679666403612,
+  "model_path": null,
+  "log_ret_mode": false,
+  "v_in": null,
+  "n_features": 1,
+  "aux_source": null,
+  "aux_test_source": null,
+  "aux_columns": null,
+  "ghost_source_index": null,
+  "ghost_lag": null,
+  "notes": "Baseline flat gana \u2014 NN no aporta en backtest 252d."
+}
